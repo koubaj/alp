@@ -1,0 +1,17 @@
+
+Examples for HW08 easy and hard.
+
+Notes for EASY+HARD 
+
+Input is in ".txt" file, e.g. "easy-7777.txt".
+Each possible solution has its own file (in form: easy-7777-sol-X-cost-Y.sol), where X is the number of that solution and Y is the cost of it (the cost is important only for hard HW).
+If no "*.sol" file is given (i.e, no 'easy-7777*sol' exists), the output should be NOSOLUTION
+
+Student programs can report any valid solution, not all of them.
+
+
+Notes for HARD:
+Only solutions with the highest cost are shown (the cost of the solution can be derived from its filename, see above note).
+
+
+
