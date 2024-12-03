@@ -6,7 +6,6 @@ class Place():
         self.mine = False 
         self.done = False
         self.neighbours = []
-        self.n_val = 0
 
 filename = sys.argv[1]
 arr = []
@@ -27,10 +26,15 @@ for i in range(r):
             if np[0] >= 0 and np[1] >= 0 and np[0] < r and np[1] < c:
                 arr[i][j].neighbours.append([np[0], np[1]])
 
+for i in range(r):
+    for j in range(c):
         if arr[i][j].num == len(arr[i][j].neighbours):
             for np in arr[i][j].neighbours:
                 arr[np[0]][np[1]].mine = True
                 arr[np[0]][np[1]].done = True
+            for np in arr[i][j].neighbours:
+                for nnp in arr[np[0]][np[1]].neighbours:
+                    arr[nnp[0]][nnp[1]].num -= 1
 
         if arr[i][j].num == 0:
             for np in arr[i][j].neighbours:
@@ -42,53 +46,18 @@ def print_res():
             print("X" if j.mine else ".", end = "")
         print()
 
-def is_ok(pos):
-    suma = 0
-    for np in arr[pos[0]][pos[1]].neighbours:
-        if arr[np[0]][np[1]].mine:
-            suma += 1
-    if arr[pos[0]][pos[1]].num == suma:
-        return True
-    else:
-        return False
-
 def check_ok(pos):
-    if pos[0] > 0:
-        if pos[1] > 0:
-            if not is_ok([pos[0] - 1, pos[1] - 1]):
-                return False
-        if pos[1] == c - 1:
-            if not is_ok([pos[0] - 1, pos[1]]):
-                return False
-    if pos[0] == r - 1:
-        if pos[1] > 0:
-            if not is_ok([pos[0], pos[1] - 1]):
-                return False
-        if pos[1] == c - 1:
-            if not is_ok([pos[0], pos[1]]):
-                return False
+    for np in arr[pos[0]][pos[1]].neighbours:
+        score = 4 + (np[0] - pos[0]) * 3 + (np[1] - pos[1])
+        if score == 1 and pos[1] == c - 1:
+            score = 0
+        if pos[0] == r-1 and (score == 3 or (pos[1] == c-1 and score == 4)):
+            score = 0
+        if arr[np[0]][np[1]].num > score or arr[np[0]][np[1]].num < 0:
+            return False
     return True
 
-cache = {}
 def recursion(arr, pos):
-    if pos[0] > 0 and False:
-        prev = ""
-        p = max(pos[1] - 1, 0)
-        while p < c:
-            prev += "X" if arr[pos[0] - 1][p].mine else "."
-            p += 1
-        p = 0
-        while p < pos[1]:
-            prev += "X" if arr[pos[0]][p].mine else "."
-            p += 1
-        prev += str(pos[0]) + str(pos[1])
-        
-        if prev in cache:
-            print_res()
-            return False
-        else:
-            cache[prev] = True
-
     np = [pos[0] + ((pos[1] + 1) // c), (pos[1] + 1) % c]
     if pos[0] == r:
         print_res()
@@ -98,8 +67,14 @@ def recursion(arr, pos):
         recursion(arr, np)
     if not arr[pos[0]][pos[1]].done:
         arr[pos[0]][pos[1]].mine = True
+        for npp in arr[pos[0]][pos[1]].neighbours:
+            arr[npp[0]][npp[1]].num -= 1
+
         if check_ok(pos):
             recursion(arr, np)
+        
+        for npp in arr[pos[0]][pos[1]].neighbours:
+            arr[npp[0]][npp[1]].num += 1
         arr[pos[0]][pos[1]].mine = False
 
 recursion(arr, [0, 0])
