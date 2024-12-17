@@ -2,6 +2,74 @@ import base as BASE
 import copy, random, time, sys, os
 from PIL import Image, ImageDraw
 
+class Position:
+    def __init__ (self):
+        self.color = 0
+        self.value = 0
+        self.empty = True
+        self.visited = False
+        self.component = -1
+        self.neighbour = False
+
+class Card_position:
+    def __init__ (self):
+        self.color = 0
+        self.value = 0
+        self.visited = False
+        self.component = -1
+
+class Card:
+    def __init__ (self, R, C, colors):
+        self.R = R # rows
+        self.C = C # collums
+        self.arr = colors
+    def make2d(self, compc): # already got them, it is redundant
+        temp_colors = copy.deepcopy(self.arr)
+        self.arr = [[Card_position() for _ in range(self.C)] for _ in range(self.R)]
+        for i in range(self.R):
+            for j in range(self.C):
+                self.arr[i][j].color = temp_colors[i * self.C + j]
+
+        for i in range(self.R):
+            for j in range(self.C):
+                if not self.arr[i][j].visited and self.arr[i][j].color != 0:
+                    poi, score, compc = BFS(self.arr, [i, j], self.arr[i][j].color, compc)
+                    for k in poi:
+                        self.arr[k[0]][k[1]].value = score
+        return compc
+
+moves = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+def BFS(arr, pos, color, component):
+    queue = [pos]
+    arr[pos[0]][pos[1]].visited = True
+    score = 0
+    poi = [] # points of interest
+    while queue:
+        pos = queue.pop(0)
+        score += 1
+        arr[pos[0]][pos[1]].component = component
+        poi.append(pos)
+        for i in moves:
+            np = [pos[0] + i[0], pos[1] + i[1]]
+            if np[0] < 0 or np[1] < 0 or np[0] >= len(arr) or np[1] >= len(arr[0]):
+                continue
+            if not arr[np[0]][np[1]].visited and arr[np[0]][np[1]].color == color:
+                queue.append(np)
+                arr[np[0]][np[1]].visited = True
+    return poi, score, component + 1
+
+def does_fit(arr, pos, cr, cc, space_prefix):
+    fit_val = space_prefix[pos[0] + cr][pos[1] + cc]
+    if pos[0] > 0 and pos[1]  > 0:
+        fit_val += space_prefix[pos[0] - 1][pos[1] - 1]
+    if pos[0] > 0:
+        fit_val -= space_prefix[pos[0] - 1][pos[1] + cc]
+    if pos[1] > 0:
+        fit_val -= space_prefix[pos[0] + cr][pos[1] - 1]
+    if fit_val == 0:
+        return True
+    else:
+        return False
 
 #basic cards with colors 1 and 2
 #note that Brute can provide you also other cards!
@@ -39,10 +107,56 @@ C33c = [ [1,2,1],
 class Player(BASE.BasePlayer):
     def __init__(self, login, boardRows, boardCols, cardsAtHand):
         super().__init__(login, boardRows, boardCols, cardsAtHand)
-        self.playerName = "My awesome player"
+        self.playerName = "jx2004"
+        self.tournament = False
+
+        self.arr = [[Position() for j in range(self.boardCols)] for i in range(self.boardRows)]
+        self.move = 0
+
+        #for i in range(self.cardsOnDesk):
+        #    ri, ci = self.cardsOnDesk[0], self.cardsOnDesk[1]
+        #    colors = self.cardsOnDesk[2]
+        #    for Ri, i in enumerate(colors):
+        #        for Cj, j in enumerate(i):
+        #            self.arr[ri + Ri][ci + Cj].color = j
+        #            self.arr[ri + Ri][ci + Cj].empty = False
+
+        # rotate cards and store them in self.cards
+        self.cards = []
+        self.compc = 0 # component count
+        for card_2d in self.cardsAtHand:
+            temp_colors = []
+            for i in card_2d:
+                for j in i:
+                    temp_colors.append(j)
+            card = Card(len(card_2d), len(card_2d[0]), temp_colors)
+            self.cards.append(copy.deepcopy(card))
+            self.compc = self.cards[-1].make2d(self.compc)
+        
+            temp_colors = []
+            for i in range(len(card.arr) - 1, -1, -1):
+                temp_colors.append(card.arr[i])
+            self.cards.append(Card(card.R, card.C, temp_colors))
+            self.compc = self.cards[-1].make2d(self.compc)
+        
+            temp_colors = []
+            for i in range(card.C):
+                for j in range(card.R - 1, -1, -1):
+                    temp_colors.append(card.arr[j * card.C + i])
+            self.cards.append(Card(card.C, card.R, temp_colors))
+            self.compc = self.cards[-1].make2d(self.compc)
+        
+            temp_colors = []
+            for i in range(card.C - 1, -1, -1):
+                for j in range(card.R):
+                    temp_colors.append(card.arr[j * card.C + i])
+            self.cards.append(Card(card.C, card.R, temp_colors))
+            self.compc = self.cards[-1].make2d(self.compc)
+            
 
     def play(self,newCardOnDesk):
-        """ this method is called during the game. 
+        {
+            """ this method is called during the game. 
             The input argument newCardOnDesk is:
             - [] if other player didn't place any card in his move), or
             - [row, col, cardMatrix], which informs your player that cardMatrix was placed at row,col to the game board
@@ -50,32 +164,136 @@ class Player(BASE.BasePlayer):
             Return value: 
             - [ row, col, cardMatrix ] if you want to place a card, or
             - [] if no card can be placed 
-        """
+            """
 
-        #recommened steps 
-        #step 0: write newCardOnDesk to list of cards that are on the board game
-        #step 1: compute all possible placement of your all (so for available) cards
-        #step 2: evaluate each placement, i.e., compute score for it
-        #step 3: select card that you want to place to the game board, mark it as used (not available in future)
-        #step 4: return your placement, or [] if no placement can be made
-        #the following code DOES NOT provides correct moves, 
-        #it just return random card at random position
+            #recommened steps 
+            #step 0: write newCardOnDesk to list of cards that are on the board game
+            #step 1: compute all possible placement of your all (so for available) cards
+            #step 2: evaluate each placement, i.e., compute score for it
+            #step 3: select card that you want to place to the game board, mark it as used (not available in future)
+            #step 4: return your placement, or [] if no placement can be made
+            #the following code DOES NOT provides correct moves, 
+            #it just return random card at random position
+        }
+        
+        # add a new card on the desk
+        self.move += 1
+        if self.move == 1 and newCardOnDesk == []:
+            self.arr[0][0].neighbour = True
+        elif newCardOnDesk != []:
+            for i in range(len(newCardOnDesk[2])):
+                for j in range(len(newCardOnDesk[2][0])):
+                    self.arr[i + newCardOnDesk[0]][j + newCardOnDesk[1]].color = newCardOnDesk[2][i][j]
+                    self.arr[i + newCardOnDesk[0]][j + newCardOnDesk[1]].empty = False
 
-        if len(newCardOnDesk) == 3:
-            self.cardsOnDesk += [ newCardOnDesk ]
 
-        if len(self.cardsAtHand) == 0:
+        # TODO change to do it only for new cards
+        # add value to points of interest and make a list of them
+        poi = [[] for i in range(5)]
+        for i in range(self.boardRows):
+            for j in range(self.boardCols):
+                if not self.arr[i][j].empty and self.arr[i][j].color != 0 and not self.arr[i][j].visited:
+                    local_poi, score, self.compc = BFS(self.arr, [i, j], self.arr[i][j].color, self.compc)
+                    for k in local_poi:
+                        self.arr[k[0]][k[1]].value = score
+                        poi[self.arr[k[0]][k[1]].color].append([k[0], k[1]])
+                # is neighbour
+                if self.arr[i][j].empty:
+                    is_neighbour = False
+                    for m in moves:
+                        np = [i + m[0], j + m[1]]
+                        if np[0] < 0 or np[1] < 0 or np[0] >= self.boardRows or np[1] >= self.boardCols:
+                            continue
+                        if not self.arr[np[0]][np[1]].empty:
+                            is_neighbour = True
+                            break
+                    if is_neighbour:
+                        self.arr[i][j].neighbour = True
+
+
+        # prefix to find does_fit faster
+        space_prefix = [[0] * self.boardCols for i in range(self.boardRows)]
+        for i in range(self.boardRows):
+            for j in range(self.boardCols):
+                if i > 0:
+                    space_prefix[i][j] += space_prefix[i-1][j]
+                if j > 0:
+                    space_prefix[i][j] += space_prefix[i][j-1]
+                if i > 0 and j > 0:
+                    space_prefix[i][j] -= space_prefix[i-1][j-1]
+                if not self.arr[i][j].empty:
+                    space_prefix[i][j] += 1
+
+        max_score = -1
+        ans = []
+        for i in range(self.boardRows):
+            for j in range(self.boardCols):
+                for count, card in enumerate(self.cards):
+                    # can i place this card here?
+                    if i + card.R - 1 >= self.boardRows or j + card.C - 1 >= self.boardCols:
+                        continue
+                    if not does_fit(self.arr, [i, j], card.R - 1, card.C - 1, space_prefix):
+                        continue
+                    
+                    neighbour = False
+                    for ic in range(card.R):
+                        for jc in range(card.C):
+                            # to check only board
+                            if jc > 0 and ic > 0 and ic < card.R-1:
+                                jc = card.C - 1
+                            if self.arr[i + ic][j + jc].neighbour:
+                                neighbour = True
+                                break
+                        if neighbour:
+                            break
+                    if not neighbour:
+                        continue
+                    
+                    # find score
+                    used_components = {}
+                    score = 0
+                    for ic in range(card.R):
+                        for jc in range(card.C):
+                            if jc > 0 and ic > 0 and ic < card.R-1:
+                                jc = card.C - 1
+                            if card.arr[ic][jc].color == 0:
+                                continue
+                            pos = [i + ic, j + jc]
+                            for m in moves:
+                                np = [pos[0] + m[0], pos[1] + m[1]]
+                                if np[0] < 0 or np[1] < 0 or np[0] >= self.boardRows or np[1] >= self.boardCols:
+                                    continue
+                                if self.arr[np[0]][np[1]].color == card.arr[ic][jc].color:
+                                    if self.arr[np[0]][np[1]].component not in used_components:
+                                        score += self.arr[np[0]][np[1]].value
+                                        used_components[self.arr[np[0]][np[1]].component] = True
+                                    if card.arr[ic][jc].component not in used_components:
+                                        score += card.arr[ic][jc].value
+                                        used_components[card.arr[ic][jc].component] = True
+                    if score > max_score:
+                        max_score = score
+                        ans = [count, i, j, []]
+                        for ic in range(card.R):
+                            ans[3].append([])
+                            for jc in range(card.C):
+                                ans[3][-1].append(card.arr[ic][jc].color)
+        if max_score == -1:
             return []
+        else:
+            # add my card on desk
+            for i in range(len(ans[3])):
+                for j in range(len(ans[3][0])):
+                    self.arr[i + ans[1]][j + ans[2]].color = ans[3][i][j]
+                    self.arr[i + ans[1]][j + ans[2]].empty = False
 
-        cardindx = random.randint(0, len(self.cardsAtHand)-1)  #random index of a card
-        card = self.cardsAtHand[cardindx]
-        cardRows = len(card)
-        cardCols = len(card[0])
-        row = random.randint(0, self.boardRows-cardRows-1) 
-        col = random.randint(0, self.boardCols-cardCols-1)
-        self.cardsAtHand = self.cardsAtHand[:cardindx] + self.cardsAtHand[cardindx+1:]  #remove selected card so its not used in future
-        self.cardsOnDesk += [ [row, col, card ] ]
-        return [row, col, card ]
+            # delete used cards
+            pos = ans[0] - ans[0] % 4
+            for i in range(4):
+                self.cards.pop(pos)
+            ans.pop(0)
+
+            return ans
+
 
 
 if __name__ == "__main__":
@@ -104,5 +322,3 @@ if __name__ == "__main__":
         if p1move == [] and p2move == []:
             print("end of game")
             quit()
-
-

@@ -20,7 +20,7 @@ class Card:
     def __init__ (self, R, C, colors):
         self.R = R # rows
         self.C  = C # collums
-        self.arr = colors 
+        self.arr = colors
     def make2d(self, compc):
         temp_colors = copy.deepcopy(self.arr)
         self.arr = [[Card_position() for _ in range(self.C)] for _ in range(self.R)]
