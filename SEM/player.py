@@ -1,5 +1,6 @@
 import base as BASE
 import copy, random, time, sys, os
+import numpy as np
 from PIL import Image, ImageDraw
 
 class Position:
@@ -7,15 +8,13 @@ class Position:
         self.color = 0
         self.value = 0
         self.empty = True
-        self.visited = False
         self.component = -1
         self.neighbour = False
 
 class Card_position:
-    def __init__ (self):
-        self.color = 0
+    def __init__ (self, color):
+        self.color = color
         self.value = 0
-        self.visited = False
         self.component = -1
 
 class Card:
@@ -23,16 +22,11 @@ class Card:
         self.R = R # rows
         self.C = C # collums
         self.arr = colors
-    def make2d(self, compc): # already got them, it is redundant
-        temp_colors = copy.deepcopy(self.arr)
-        self.arr = [[Card_position() for _ in range(self.C)] for _ in range(self.R)]
+    def add_vals(self, compc):
+        self.arr = [[Card_position(self.arr[i][j]) for j in range(self.C)] for i in range(self.R)]
         for i in range(self.R):
             for j in range(self.C):
-                self.arr[i][j].color = temp_colors[i * self.C + j]
-
-        for i in range(self.R):
-            for j in range(self.C):
-                if not self.arr[i][j].visited and self.arr[i][j].color != 0:
+                if self.arr[i][j].component == -1 and self.arr[i][j].color != 0:
                     poi, score, compc = BFS(self.arr, [i, j], self.arr[i][j].color, compc)
                     for k in poi:
                         self.arr[k[0]][k[1]].value = score
@@ -41,24 +35,23 @@ class Card:
 moves = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 def BFS(arr, pos, color, component):
     queue = [pos]
-    arr[pos[0]][pos[1]].visited = True
     score = 0
     poi = [] # points of interest
     while queue:
         pos = queue.pop(0)
-        score += 1
-        arr[pos[0]][pos[1]].component = component
         poi.append(pos)
+        arr[pos[0]][pos[1]].component = component
+        score += 1
         for i in moves:
             np = [pos[0] + i[0], pos[1] + i[1]]
             if np[0] < 0 or np[1] < 0 or np[0] >= len(arr) or np[1] >= len(arr[0]):
                 continue
-            if not arr[np[0]][np[1]].visited and arr[np[0]][np[1]].color == color:
+            if arr[np[0]][np[1]].component != component and arr[np[0]][np[1]].color == color:
                 queue.append(np)
-                arr[np[0]][np[1]].visited = True
+                arr[np[0]][np[1]].component = component
     return poi, score, component + 1
 
-def does_fit(arr, pos, cr, cc, space_prefix):
+def does_fit(pos, cr, cc, space_prefix):
     fit_val = space_prefix[pos[0] + cr][pos[1] + cc]
     if pos[0] > 0 and pos[1]  > 0:
         fit_val += space_prefix[pos[0] - 1][pos[1] - 1]
@@ -70,6 +63,7 @@ def does_fit(arr, pos, cr, cc, space_prefix):
         return True
     else:
         return False
+
 
 #basic cards with colors 1 and 2
 #note that Brute can provide you also other cards!
@@ -108,51 +102,49 @@ class Player(BASE.BasePlayer):
     def __init__(self, login, boardRows, boardCols, cardsAtHand):
         super().__init__(login, boardRows, boardCols, cardsAtHand)
         self.playerName = "jx2004"
-        self.tournament = False
+        self.tournament = True
 
         self.arr = [[Position() for j in range(self.boardCols)] for i in range(self.boardRows)]
         self.move = 0
 
-        #for i in range(self.cardsOnDesk):
-        #    ri, ci = self.cardsOnDesk[0], self.cardsOnDesk[1]
-        #    colors = self.cardsOnDesk[2]
-        #    for Ri, i in enumerate(colors):
-        #        for Cj, j in enumerate(i):
-        #            self.arr[ri + Ri][ci + Cj].color = j
-        #            self.arr[ri + Ri][ci + Cj].empty = False
-
         # rotate cards and store them in self.cards
         self.cards = []
         self.compc = 0 # component count
-        for card_2d in self.cardsAtHand:
-            temp_colors = []
-            for i in card_2d:
-                for j in i:
-                    temp_colors.append(j)
-            card = Card(len(card_2d), len(card_2d[0]), temp_colors)
-            self.cards.append(copy.deepcopy(card))
-            self.compc = self.cards[-1].make2d(self.compc)
-        
-            temp_colors = []
-            for i in range(len(card.arr) - 1, -1, -1):
-                temp_colors.append(card.arr[i])
-            self.cards.append(Card(card.R, card.C, temp_colors))
-            self.compc = self.cards[-1].make2d(self.compc)
-        
-            temp_colors = []
-            for i in range(card.C):
-                for j in range(card.R - 1, -1, -1):
-                    temp_colors.append(card.arr[j * card.C + i])
-            self.cards.append(Card(card.C, card.R, temp_colors))
-            self.compc = self.cards[-1].make2d(self.compc)
-        
-            temp_colors = []
-            for i in range(card.C - 1, -1, -1):
-                for j in range(card.R):
-                    temp_colors.append(card.arr[j * card.C + i])
-            self.cards.append(Card(card.C, card.R, temp_colors))
-            self.compc = self.cards[-1].make2d(self.compc)
-            
+        for card_in in self.cardsAtHand:
+            card = np.array(card_in)
+            for i in range(4):
+                card = np.rot90(card)
+                self.cards.append(Card(len(card), len(card[0]), card.tolist()))
+                self.compc = self.cards[-1].add_vals(self.compc)
+
+    
+    def add_card(self, card, pos):
+        for i in range(card.R):
+            for j in range(card.C):
+                self.arr[i + pos[0]][j + pos[1]].color = card.arr[i][j].color
+                self.arr[i + pos[0]][j + pos[1]].empty = False
+        # add value to card
+        for i in range(card.R):
+            for j in range(card.C):
+                # to check only boarder of card
+                if j > 0 and i > 0 and i < card.R - 1:
+                    j = card.C - 1
+                if self.arr[i][j].color != 0:
+                    local_poi, score, self.compc = BFS(self.arr, [i, j], self.arr[i][j].color, self.compc)
+                    for k in local_poi:
+                        self.arr[k[0]][k[1]].value = score
+        # create new neighbours
+        for i in range(card.R + 2):
+            for j in range(card.C):
+                # to check only around of boarder of card
+                if j > 0 and i > 0 and i < card.R + 1:
+                    j = card.C + 1
+                np = [pos[0] - 1 + i, pos[1] + j]
+                if j == 0 and i > 0 and i < card.R + 1:
+                    np[1] -= 1
+                if np[0] < 0 or np[1] < 0 or np[0] >= self.boardRows or np[1] >= self.boardCols:
+                    continue
+                self.arr[np[0]][np[1]].neighbour = True
 
     def play(self,newCardOnDesk):
         {
@@ -181,34 +173,12 @@ class Player(BASE.BasePlayer):
         if self.move == 1 and newCardOnDesk == []:
             self.arr[0][0].neighbour = True
         elif newCardOnDesk != []:
-            for i in range(len(newCardOnDesk[2])):
-                for j in range(len(newCardOnDesk[2][0])):
-                    self.arr[i + newCardOnDesk[0]][j + newCardOnDesk[1]].color = newCardOnDesk[2][i][j]
-                    self.arr[i + newCardOnDesk[0]][j + newCardOnDesk[1]].empty = False
+            new_card = Card(len(newCardOnDesk[2]), len(newCardOnDesk[2][0]), newCardOnDesk[2])
+            self.add_card(self.arr, new_card, [newCardOnDesk[0], newCardOnDesk[1]])
 
 
-        # TODO change to do it only for new cards
-        # add value to points of interest and make a list of them
-        poi = [[] for i in range(5)]
-        for i in range(self.boardRows):
-            for j in range(self.boardCols):
-                if not self.arr[i][j].empty and self.arr[i][j].color != 0 and not self.arr[i][j].visited:
-                    local_poi, score, self.compc = BFS(self.arr, [i, j], self.arr[i][j].color, self.compc)
-                    for k in local_poi:
-                        self.arr[k[0]][k[1]].value = score
-                        poi[self.arr[k[0]][k[1]].color].append([k[0], k[1]])
-                # is neighbour
-                if self.arr[i][j].empty:
-                    is_neighbour = False
-                    for m in moves:
-                        np = [i + m[0], j + m[1]]
-                        if np[0] < 0 or np[1] < 0 or np[0] >= self.boardRows or np[1] >= self.boardCols:
-                            continue
-                        if not self.arr[np[0]][np[1]].empty:
-                            is_neighbour = True
-                            break
-                    if is_neighbour:
-                        self.arr[i][j].neighbour = True
+            
+                    
 
 
         # prefix to find does_fit faster
@@ -232,13 +202,13 @@ class Player(BASE.BasePlayer):
                     # can i place this card here?
                     if i + card.R - 1 >= self.boardRows or j + card.C - 1 >= self.boardCols:
                         continue
-                    if not does_fit(self.arr, [i, j], card.R - 1, card.C - 1, space_prefix):
+                    if not does_fit([i, j], card.R - 1, card.C - 1, space_prefix):
                         continue
                     
                     neighbour = False
                     for ic in range(card.R):
                         for jc in range(card.C):
-                            # to check only board
+                            # to check only boarder of card
                             if jc > 0 and ic > 0 and ic < card.R-1:
                                 jc = card.C - 1
                             if self.arr[i + ic][j + jc].neighbour:
@@ -254,6 +224,7 @@ class Player(BASE.BasePlayer):
                     score = 0
                     for ic in range(card.R):
                         for jc in range(card.C):
+                            # to check only boarder of card
                             if jc > 0 and ic > 0 and ic < card.R-1:
                                 jc = card.C - 1
                             if card.arr[ic][jc].color == 0:
@@ -272,11 +243,9 @@ class Player(BASE.BasePlayer):
                                         used_components[card.arr[ic][jc].component] = True
                     if score > max_score:
                         max_score = score
-                        ans = [count, i, j, []]
-                        for ic in range(card.R):
-                            ans[3].append([])
-                            for jc in range(card.C):
-                                ans[3][-1].append(card.arr[ic][jc].color)
+                        ans = count
+
+        
         if max_score == -1:
             return []
         else:
@@ -287,7 +256,7 @@ class Player(BASE.BasePlayer):
                     self.arr[i + ans[1]][j + ans[2]].empty = False
 
             # delete used cards
-            pos = ans[0] - ans[0] % 4
+            pos = ans - ans % 4
             for i in range(4):
                 self.cards.pop(pos)
             ans.pop(0)
