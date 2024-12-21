@@ -129,8 +129,9 @@ class Player(BASE.BasePlayer):
                 # to check only boarder of card
                 if j > 0 and i > 0 and i < card.R - 1:
                     j = card.C - 1
+                np = [pos[0] + i, pos[1] + j]
                 if self.arr[i][j].color != 0:
-                    local_poi, score, self.compc = BFS(self.arr, [i, j], self.arr[i][j].color, self.compc)
+                    local_poi, score, self.compc = BFS(self.arr, [np[0], np[1]], self.arr[np[0]][np[1]].color, self.compc)
                     for k in local_poi:
                         self.arr[k[0]][k[1]].value = score
         # create new neighbours
@@ -173,13 +174,11 @@ class Player(BASE.BasePlayer):
         if self.move == 1 and newCardOnDesk == []:
             self.arr[0][0].neighbour = True
         elif newCardOnDesk != []:
+            self.cardsOnDesk += [ newCardOnDesk ]
             new_card = Card(len(newCardOnDesk[2]), len(newCardOnDesk[2][0]), newCardOnDesk[2])
-            self.add_card(self.arr, new_card, [newCardOnDesk[0], newCardOnDesk[1]])
-
-
-            
-                    
-
+            self.compc = new_card.add_vals(self.compc)
+            self.add_card(new_card, [newCardOnDesk[0], newCardOnDesk[1]])
+        
 
         # prefix to find does_fit faster
         space_prefix = [[0] * self.boardCols for i in range(self.boardRows)]
@@ -243,25 +242,28 @@ class Player(BASE.BasePlayer):
                                         used_components[card.arr[ic][jc].component] = True
                     if score > max_score:
                         max_score = score
-                        ans = count
+                        ans = [count, i, j]
 
         
         if max_score == -1:
             return []
         else:
             # add my card on desk
-            for i in range(len(ans[3])):
-                for j in range(len(ans[3][0])):
-                    self.arr[i + ans[1]][j + ans[2]].color = ans[3][i][j]
-                    self.arr[i + ans[1]][j + ans[2]].empty = False
+            self.add_card(self.cards[ans[0]], [ans[1], ans[2]])
 
-            # delete used cards
-            pos = ans - ans % 4
+            ans_return = [ans[1], ans[2], []]
+            for i in self.cards[ans[0]].arr:
+                ans_return[2].append([])
+                for j in i:
+                    ans_return[2][-1].append(j.color)
+
+            # delete used card and it`s rotations
+            pos = ans[0] - ans[0] % 4
             for i in range(4):
                 self.cards.pop(pos)
-            ans.pop(0)
 
-            return ans
+            self.cardsOnDesk += [ans_return]
+            return ans_return
 
 
 
